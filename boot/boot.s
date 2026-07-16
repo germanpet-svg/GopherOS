@@ -28,6 +28,13 @@ _start:
     mov esp, stack_top
     xor ebp, ebp
     cli
+    cmp eax, 0x2BADB002
+    jne .no_mb
+    push ebx
+    jmp .call_main
+.no_mb:
+    push 0
+.call_main:
     call kernel_main
 .hang:
     hlt

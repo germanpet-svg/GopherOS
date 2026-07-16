@@ -423,6 +423,7 @@ void shell_main(void) {
             else vga_puts("[shell] gopherpy_demo lanzado, cediendo turno...\n");
         } else if (strcmp(cmd, "ring3demo") == 0) {
             FileEntry* f = fs_find("/ring3demo.gxe");
+            if (f == NULL || f->is_dir) f = fs_find("/demo/ring3demo.gxe");
             if (f == NULL || f->is_dir) {
                 vga_puts("ring3demo: /ring3demo.gxe no encontrado\n");
             } else {

@@ -19,6 +19,7 @@ OBJS = \
     $(BUILD)/boot.o \
     $(BUILD)/isr.o \
     $(BUILD)/kernel.o \
+    $(BUILD)/multiboot.o \
     $(BUILD)/string.o \
     $(BUILD)/vga.o \
     $(BUILD)/serial.o \
@@ -75,10 +76,12 @@ check: $(BUILD)/gopheros.elf
 	grub-file --is-x86-multiboot $(BUILD)/gopheros.elf && echo "Multiboot OK"
 
 # Imagen ISO booteable via GRUB (opcional, para USB/CD real o VirtualBox/VMware)
-iso: $(BUILD)/gopheros.elf
+iso: $(BUILD)/gopheros.elf | $(BUILD)/ring3demo.gxe
 	mkdir -p $(BUILD)/isodir/boot/grub
+	mkdir -p $(BUILD)/isodir/demo
 	cp $(BUILD)/gopheros.elf $(BUILD)/isodir/boot/gopheros.elf
 	cp boot/grub.cfg $(BUILD)/isodir/boot/grub/grub.cfg
+	cp $(BUILD)/ring3demo.gxe $(BUILD)/isodir/demo/ring3demo.gxe
 	grub-mkrescue -o $(BUILD)/gopheros.iso $(BUILD)/isodir 2>/dev/null
 
 run: $(BUILD)/gopheros.elf
