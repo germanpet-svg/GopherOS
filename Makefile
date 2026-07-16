@@ -82,7 +82,7 @@ iso: $(BUILD)/gopheros.elf | $(BUILD)/ring3demo.gxe
 	cp $(BUILD)/gopheros.elf $(BUILD)/isodir/boot/gopheros.elf
 	cp boot/grub.cfg $(BUILD)/isodir/boot/grub/grub.cfg
 	cp $(BUILD)/ring3demo.gxe $(BUILD)/isodir/demo/ring3demo.gxe
-	grub-mkrescue -o $(BUILD)/gopheros.iso $(BUILD)/isodir 2>/dev/null
+	grub-mkrescue -o $(BUILD)/gopheros.iso $(BUILD)/isodir
 
 run: $(BUILD)/gopheros.elf
 	qemu-system-i386 -kernel $(BUILD)/gopheros.elf -m 32 -serial stdio
