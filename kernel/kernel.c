@@ -97,6 +97,22 @@ void kernel_main(void) {
     syscall_init();
 
     fs_init();
+
+    // Cargar el programa de usuario .gxe embebido en el binario del kernel
+    // para que el shell pueda ejecutarlo con 'ring3demo'.
+    {
+        extern uint8_t _binary_build_ring3demo_gxe_start[];
+        extern uint8_t _binary_build_ring3demo_gxe_end[];
+        size_t gxe_size = (size_t)(_binary_build_ring3demo_gxe_end - _binary_build_ring3demo_gxe_start);
+        Region* init_region = region_new(65536);
+        if (init_region && gxe_size > 0) {
+            fs_create_result_t fr = fs_create("/ring3demo.gxe", init_region);
+            if (fr.is_ok) {
+                fs_append(fr.value, _binary_build_ring3demo_gxe_start, gxe_size, init_region);
+            }
+        }
+    }
+
     bool have_disk = disk_init();
     vga_puts("[kernel] disco ATA: ");
     vga_puts(have_disk ? "detectado\n" : "no detectado (fs solo en RAM)\n");

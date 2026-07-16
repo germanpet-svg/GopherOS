@@ -32,8 +32,8 @@ OBJS = \
     $(BUILD)/graphics.o \
     $(BUILD)/disk.o \
     $(BUILD)/gopherpy_demo.o \
-    $(BUILD)/ring3_demo.o \
     $(BUILD)/spinlock.o \
+    $(BUILD)/ring3demo_gxe.o \
     $(BUILD)/memory.o \
     $(BUILD)/process.o \
     $(BUILD)/syscall.o \
@@ -56,8 +56,19 @@ $(BUILD)/isr.o: kernel/isr.s | $(BUILD)
 $(BUILD)/%.o: kernel/%.c | $(BUILD)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD)/gopheros.elf: $(OBJS) kernel/linker.ld
+$(BUILD)/gopheros.elf: $(OBJS) kernel/linker.ld | $(BUILD)/ring3demo.gxe
 	$(LD) $(LDFLAGS) -o $@ $(OBJS)
+
+# ---------- programas de usuario (.gxe) ----------
+
+$(BUILD)/ring3demo.gxe: $(BUILD)/ring3demo.bin tools/mkgxe.py | $(BUILD)
+	python3 tools/mkgxe.py --entry 0 $< $@
+
+$(BUILD)/ring3demo.bin: $(BUILD)/ring3demo.elf | $(BUILD)
+	objcopy -O binary $< $@
+
+$(BUILD)/ring3demo.elf: user/crt0.c user/ring3_demo.c user/linker.ld | $(BUILD)
+	$(CC) $(CFLAGS) -T user/linker.ld -Wl,-z,notext user/crt0.c user/ring3_demo.c -o $@
 
 # Verifica que el binario tenga cabecera Multiboot valida
 check: $(BUILD)/gopheros.elf
@@ -81,6 +92,9 @@ run-disk: $(BUILD)/gopheros.elf $(BUILD)/disk.img
 
 $(BUILD)/disk.img: | $(BUILD)
 	qemu-img create -f raw $@ 10M
+
+$(BUILD)/ring3demo_gxe.o: $(BUILD)/ring3demo.gxe | $(BUILD)
+	objcopy -I binary -O elf32-i386 -B i386 $< $@
 
 clean:
 	rm -rf $(BUILD)

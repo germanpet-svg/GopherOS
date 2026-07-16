@@ -8,11 +8,13 @@
 #include "hal.h"
 #include "string.h"
 #include "typesafe.h"
+#include "memory.h"
 
 #define ARENA_PAGES  2048                 // 8 MB de RAM gestionable
 #define ARENA_BYTES  (ARENA_PAGES * PAGE_SIZE)
 
-static uint8_t arena[ARENA_BYTES] __attribute__((aligned(4096)));
+uint8_t arena[ARENA_BYTES] __attribute__((aligned(4096)));
+uint8_t* arena_base = arena;
 static uint8_t page_bitmap[ARENA_PAGES];  // 1 = usada
 static size_t next_free_hint = 0;
 
@@ -54,7 +56,7 @@ void page_free(phys_addr_t addr, size_t num_pages) {
     if (start < next_free_hint) next_free_hint = start;
 }
 
-static inline void* phys_to_virt(phys_addr_t p) {
+void* phys_to_virt(phys_addr_t p) {
     return (void*)(arena + p);
 }
 
