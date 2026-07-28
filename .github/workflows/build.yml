@@ -1,0 +1,39 @@
+name: Build GopherOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nasm gcc-multilib qemu-system-x86 grub-common grub-pc-bin xorriso mtools qemu-utils
+
+      - name: Build kernel
+        run: make
+
+      - name: Check Multiboot
+        run: make check
+
+      - name: Build ISO
+        run: make iso
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gopheros-artifacts
+          path: |
+            build/gopheros.elf
+            build/ring3demo.gxe
+            build/gopheros.iso

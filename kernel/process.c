@@ -11,6 +11,9 @@
 #include "vga.h"
 #include "kresults.h"
 #include "filesystem.h"
+#include "memory.h"
+#include "paging.h"
+#include "gxe.h"
 
 // Actualiza TSS.ESP0 usado por la CPU para syscalls/excepciones desde ring 3.
 extern void tss_set_esp0(uint32_t esp0);
@@ -45,6 +48,7 @@ typedef struct Process {
     Region* region;
     uint32_t esp;
     uint8_t* kstack_top;
+    uint32_t page_dir;       // direccion fisica del page directory (CR3)
     char name[16];
     uint32_t jiffies_start;
     opt_u32_t blocked_on;
@@ -103,6 +107,7 @@ proc_result_t proc_create(const char* name, void (*entry)(void)) {
 
     p->esp = (uint32_t)sp;
     p->kstack_top = stack_top;
+    p->page_dir = paging_kernel_dir_phys();
     p->pid = next_pid++;
     p->state = PROC_READY;
     p->jiffies_start = jiffies;
@@ -132,29 +137,65 @@ static void ring3_trampoline(void) {
     for (;;) cpu_halt(); // enter_ring3 no deberia retornar jamas
 }
 
-proc_result_t proc_create_ring3(const char* name, void (*entry)(void), size_t user_stack_size) {
+proc_result_t proc_create_gxe(const char* name, const uint8_t* data, size_t size) {
+    if (size < sizeof(gxe_header_t)) {
+        proc_result_t res = Err(GOS_EINVAL); return res;
+    }
+
+    gxe_header_t header;
+    memcpy(&header, data, sizeof(header));
+    if (header.magic != GXE_MAGIC || header.version != GXE_VERSION) {
+        proc_result_t res = Err(GOS_EINVAL); return res;
+    }
+
+    size_t image_pages  = (header.image_size + PAGE_SIZE - 1) / PAGE_SIZE;
+    size_t bss_pages    = (header.bss_size + PAGE_SIZE - 1) / PAGE_SIZE;
+    size_t stack_size   = header.stack_size > PAGE_SIZE ? header.stack_size : (16 * 1024);
+    size_t stack_pages  = (stack_size + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    // Imagen + BSS contiguos fisicamente para copiar/limpiar de una.
+    phys_addr_t img_offset = page_alloc(image_pages + bss_pages);
+    if (img_offset == 0) {
+        proc_result_t res = Err(GOS_ENOMEM); return res;
+    }
+    uint32_t img_phys = (uint32_t)arena_base + img_offset;
+    uint8_t* img_virt = (uint8_t*)phys_to_virt(img_offset);
+
+    phys_addr_t stk_offset = page_alloc(stack_pages);
+    if (stk_offset == 0) {
+        page_free(img_offset, image_pages + bss_pages);
+        proc_result_t res = Err(GOS_ENOMEM); return res;
+    }
+    uint32_t stk_phys = (uint32_t)arena_base + stk_offset;
+    uint8_t* stk_virt = (uint8_t*)phys_to_virt(stk_offset);
+
+    memcpy(img_virt, data + sizeof(gxe_header_t), header.image_size);
+    memset(img_virt + header.image_size, 0, header.bss_size);
+    memset(stk_virt, 0, stack_pages * PAGE_SIZE);
+
     int slot = -1;
     for (int i = 0; i < MAX_PROCESSES; i++) {
         if (processes[i].state == PROC_UNUSED) { slot = i; break; }
     }
     if (slot < 0) {
-        proc_result_t res = Err(GOS_EBUSY);
-        return res;
+        page_free(img_offset, image_pages + bss_pages);
+        page_free(stk_offset, stack_pages);
+        proc_result_t res = Err(GOS_EBUSY); return res;
     }
 
     Process* p = &processes[slot];
     size_t kstack_size = 4096;
-    p->region = region_new(kstack_size + user_stack_size + 8192);
+    p->region = region_new(kstack_size + 8192);
     if (p->region == NULL) {
-        proc_result_t res = Err(GOS_ENOMEM);
-        return res;
+        page_free(img_offset, image_pages + bss_pages);
+        page_free(stk_offset, stack_pages);
+        proc_result_t res = Err(GOS_ENOMEM); return res;
     }
 
     uint8_t* kstack_top = (uint8_t*)region_alloc(p->region, kstack_size) + kstack_size;
-    uint8_t* ustack_top = (uint8_t*)region_alloc(p->region, user_stack_size) + user_stack_size;
 
     uint32_t* sp = (uint32_t*)kstack_top;
-    sp -= 1; *sp = (uint32_t)ring3_trampoline; // "ret" saltara aca (en CPL0 todavia)
+    sp -= 1; *sp = (uint32_t)ring3_trampoline;
     sp -= 1; *sp = 0;  // saved ebp
     sp -= 1; *sp = 0;  // eax
     sp -= 1; *sp = 0;  // ecx
@@ -165,15 +206,31 @@ proc_result_t proc_create_ring3(const char* name, void (*entry)(void), size_t us
     sp -= 1; *sp = 0;  // esi
     sp -= 1; *sp = 0;  // edi
 
+    uint32_t pd_phys = paging_create_user_dir();
+    if (pd_phys == 0 ||
+        !paging_map(pd_phys, GXE_USER_BASE, img_phys, image_pages + bss_pages,
+                    PTE_RW | PTE_US) ||
+        !paging_map(pd_phys, GXE_USER_BASE + GXE_USER_SIZE - stack_pages * PAGE_SIZE,
+                    stk_phys, stack_pages, PTE_RW | PTE_US)) {
+        if (pd_phys) {
+            // Sin ruta de liberacion de page tables por ahora.
+        }
+        region_destroy(p->region);
+        page_free(img_offset, image_pages + bss_pages);
+        page_free(stk_offset, stack_pages);
+        proc_result_t res = Err(GOS_ENOMEM); return res;
+    }
+
     p->esp = (uint32_t)sp;
     p->kstack_top = kstack_top;
+    p->page_dir = pd_phys;
     p->pid = next_pid++;
     p->state = PROC_READY;
     p->jiffies_start = jiffies;
     p->blocked_on = (opt_u32_t)None;
     p->is_ring3 = true;
-    p->ring3_entry = entry;
-    p->ring3_user_stack = (uint32_t)ustack_top;
+    p->ring3_entry = (void (*)(void))(GXE_USER_BASE + header.entry_offset);
+    p->ring3_user_stack = GXE_USER_BASE + GXE_USER_SIZE - 4;
     memset(p->fds, 0, sizeof(p->fds));
     strncpy(p->name, name, 16);
 
@@ -331,6 +388,9 @@ void proc_yield(void) {
                     return;
                 }
 
+                // Activar el espacio de direcciones del proceso que va a correr.
+                paging_switch_dir(current->page_dir);
+
                 uint32_t* old_store = prev ? &prev->esp : &idle_esp;
                 context_switch(old_store, current->esp);
                 return;
@@ -387,6 +447,7 @@ _Noreturn void scheduler_run(void) {
             current = &processes[i];
             current->state = PROC_RUNNING;
             tss_set_esp0((uint32_t)current->kstack_top);
+            paging_switch_dir(current->page_dir);
             context_switch(&idle_esp, current->esp);
             break;
         }

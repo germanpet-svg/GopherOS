@@ -9,6 +9,7 @@
 #include "kresults.h"
 #include "filesystem.h"
 #include "disk.h"
+#include "multiboot.h"
 
 extern void memory_init(void);
 extern phys_addr_t page_alloc(size_t num_pages);
@@ -74,7 +75,7 @@ extern void shell_main(void);
 // ============================================================
 // Kernel entry - Llamado desde boot.s
 // ============================================================
-void kernel_main(void) {
+void kernel_main(uint32_t mb_info) {
     irq_disable();
 
     extern void serial_init(void);
@@ -97,6 +98,29 @@ void kernel_main(void) {
     syscall_init();
 
     fs_init();
+
+    Region* init_region = region_new(65536);
+
+    // Cargar programas .gxe pasados por GRUB como modulos Multiboot.
+    // Esto permite incluir archivos en el ISO (ej. /demo/ring3demo.gxe).
+    if (init_region) {
+        multiboot_load_files(mb_info, init_region);
+    }
+
+    // Cargar el programa de usuario .gxe embebido en el binario del kernel
+    // para que 'ring3demo' funcione tambien con `qemu -kernel` (sin modulos).
+    if (init_region) {
+        extern uint8_t _binary_build_ring3demo_gxe_start[];
+        extern uint8_t _binary_build_ring3demo_gxe_end[];
+        size_t gxe_size = (size_t)(_binary_build_ring3demo_gxe_end - _binary_build_ring3demo_gxe_start);
+        if (gxe_size > 0) {
+            fs_create_result_t fr = fs_create("/ring3demo.gxe", init_region);
+            if (fr.is_ok) {
+                fs_append(fr.value, _binary_build_ring3demo_gxe_start, gxe_size, init_region);
+            }
+        }
+    }
+
     bool have_disk = disk_init();
     vga_puts("[kernel] disco ATA: ");
     vga_puts(have_disk ? "detectado\n" : "no detectado (fs solo en RAM)\n");

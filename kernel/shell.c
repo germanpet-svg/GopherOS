@@ -20,9 +20,8 @@ extern uint32_t proc_current_pid(void);
 extern void proc_exit(int code);
 extern int proc_list(uint32_t* pids, char names[][16], int* states, int max);
 extern proc_result_t proc_create(const char* name, void (*entry)(void));
-extern proc_result_t proc_create_ring3(const char* name, void (*entry)(void), size_t user_stack_size);
+extern proc_result_t proc_create_gxe(const char* name, const uint8_t* data, size_t size);
 extern void gopherpy_demo_main(void);
-extern void ring3_demo_main(void);
 
 static Region* shell_region = NULL; // para 'copy'/'load' (necesitan alocar espacio para datos)
 static char cwd[128] = "/";
@@ -423,9 +422,15 @@ void shell_main(void) {
             if (!p.is_ok) vga_puts("gopherpy: no se pudo crear el proceso\n");
             else vga_puts("[shell] gopherpy_demo lanzado, cediendo turno...\n");
         } else if (strcmp(cmd, "ring3demo") == 0) {
-            proc_result_t p = proc_create_ring3("ring3_demo", ring3_demo_main, 8192);
-            if (!p.is_ok) vga_puts("ring3demo: no se pudo crear el proceso\n");
-            else vga_puts("[shell] ring3_demo lanzado en CPL3 de verdad...\n");
+            FileEntry* f = fs_find("/ring3demo.gxe");
+            if (f == NULL || f->is_dir) f = fs_find("/demo/ring3demo.gxe");
+            if (f == NULL || f->is_dir) {
+                vga_puts("ring3demo: /ring3demo.gxe no encontrado\n");
+            } else {
+                proc_result_t p = proc_create_gxe("ring3_demo", f->data, f->size);
+                if (!p.is_ok) vga_puts("ring3demo: no se pudo crear el proceso\n");
+                else vga_puts("[shell] ring3_demo.gxe lanzado en CPL3 real...\n");
+            }
         } else if (strcmp(cmd, "about") == 0) {
             cmd_about();
         } else if (strcmp(cmd, "exit") == 0) {
