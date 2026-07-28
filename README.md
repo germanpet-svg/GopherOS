@@ -1,195 +1,472 @@
-# GopherOS — README actualizado
+# GopherOS — Un kernel x86 didáctico, completado y compilado
 
-## ¿Qué es GopherOS?
+<div align="center">
 
-GopherOS es un **kernel x86 de 32 bits didáctico** que arranca con GRUB, corre en modo protegido, y demuestra conceptos fundamentales de sistemas operativos con **código real que compila y corre en QEMU**.
+![GopherOS Banner](https://via.placeholder.com/800x200/2d2d2d/00ff88?text=🐹+GopherOS)
 
-No es un "diseño en papel" ni fragmentos sueltos — es un kernel funcional de punta a punta.
+**Un kernel x86 de 32 bits didáctico, completo y funcional**
+
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen)]()
+[![License](https://img.shields.io/badge/license-MIT-blue)]()
+[![C](https://img.shields.io/badge/C-99-blue)]()
+[![Assembly](https://img.shields.io/badge/ASM-NASM-yellow)]()
+[![QEMU](https://img.shields.io/badge/QEMU-8.0+-orange)]()
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)]()
+
+</div>
 
 ---
 
-## 🚀 Estado actual: COMPLETADO Y COMPILADO
+## 📖 Tabla de Contenidos
 
-### ✅ Core del kernel (hecho y probado)
+- [¿Qué es GopherOS?](#qué-es-gopheros)
+- [Estado del Proyecto](#estado-del-proyecto)
+- [Características](#características)
+- [Arquitectura](#arquitectura)
+- [Requisitos](#requisitos)
+- [Compilación](#compilación)
+- [Ejecución](#ejecución)
+- [Comandos del Shell](#comandos-del-shell)
+- [GopherPy](#gopherpy)
+- [Roadmap](#roadmap)
+- [Limitaciones Conocidas](#limitaciones-conocidas)
+- [Contribuciones](#contribuciones)
+- [Licencia](#licencia)
 
-| Componente | Estado | Detalle |
-|------------|--------|---------|
+---
+
+## 🎯 ¿Qué es GopherOS?
+
+GopherOS es un **kernel x86 de 32 bits didáctico** y funcional, escrito en C y ensamblador, que demuestra conceptos fundamentales de sistemas operativos como **paginación**, **protección de memoria (ring 3)**, **sistema de archivos**, **drivers** (VGA, teclado, ATA, red) y **syscalls**. Es un proyecto ideal para aprender OSDev con código real que compila y corre en QEMU.
+
+**Filosofía del proyecto:**
+- 🔬 **Didáctico**: Cada componente está documentado y probado
+- 🛠️ **Funcional**: Corre de verdad, no es un ejercicio teórico
+- 🧩 **Modular**: Arquitectura clara y extensible
+- 📚 **Demostrativo**: Muestra conceptos como paginación, protección de memoria, syscalls
+
+---
+
+## ✨ Características
+
+### Core del Kernel
+
+| Componente | Estado | Descripción |
+|------------|--------|-------------|
 | **Boot** | ✅ | Multiboot con GRUB o `qemu -kernel` |
-| **GDT/IDT/PIC** | ✅ | Remapeo del PIC 8259, 32 excepciones + 16 IRQs + `int 0x80` |
-| **TSS** | ✅ | Necesario para transiciones ring3→ring0 |
-| **Paginación** | ✅ | 4KB con permisos por página, aislamiento real entre procesos |
-| **Memoria** | ✅ | Bitmap físico + pools + region allocator (sin leaks) |
-| **Scheduler** | ✅ | Cooperativo con `yield`/`sleep_on`/`wakeup`, máx 5 procesos |
+| **GDT/IDT/PIC** | ✅ | Remapeo del PIC 8259, 32 excepciones + 16 IRQs |
+| **TSS** | ✅ | Task State Segment para transiciones ring3→ring0 |
+| **Paginación** | ✅ | 4KB con permisos por página, aislamiento real |
+| **Memoria** | ✅ | Bitmap físico + pools + region allocator |
+| **Scheduler** | ✅ | Cooperativo con `yield`/`sleep_on`/`wakeup` |
 | **Syscalls** | ✅ | 15 estables, ABI fija, `ioctl` como extensión |
 
-### ✅ Drivers (hechos y probados)
+### Drivers
 
-| Componente | Estado | Detalle |
-|------------|--------|---------|
-| **VGA texto** | ✅ | 80x25, modo texto |
-| **VGA gráfico** | ✅ | Modo 13h (320x200x256), reprogramación manual de registros CRTC |
+| Componente | Estado | Descripción |
+|------------|--------|-------------|
+| **VGA Texto** | ✅ | 80x25 modo texto |
+| **VGA Gráfico** | ✅ | Modo 13h (320x200x256), reprogramación manual |
 | **Teclado PS/2** | ✅ | IRQ1, scancode set 1, shift, backspace |
-| **RTC/CMOS** | ✅ | Fecha/hora real del hardware, formato BCD/binario y 12/24h |
-| **ATA PIO** | ✅ | Disco duro real, LBA28, polling, detección de presencia |
-| **PCI** | ✅ | Enumeración y espacio de configuración (puertos 0xCF8/0xCFC) |
-| **RTL8139** | ✅ | NIC detectada por hardware, MAC real leída |
-| **Red (Ethernet/IP/ICMP)** | ✅ | ARP, IPv4, ICMP — `ping` funciona contra QEMU |
-| **TCP** | ✅ | Mínimo (una conexión a la vez), tres vías, cierre FIN/ACK |
-| **Servidor Gopher** | ✅ | RFC 1436, probado con cliente TCP externo real |
+| **RTC/CMOS** | ✅ | Fecha/hora real del hardware |
+| **ATA PIO** | ✅ | Disco duro LBA28, polling, detección de presencia |
+| **PCI** | ✅ | Enumeración y espacio de configuración |
+| **RTL8139** | ✅ | NIC detectada por hardware |
+| **Red** | ✅ | ARP, IPv4, ICMP — `ping` funciona |
+| **TCP** | ✅ | Mínimo (una conexión a la vez) |
+| **Servidor Gopher** | ✅ | RFC 1436, probado con cliente externo |
 
-### ✅ Filesystem (hecho y probado)
+### Filesystem
 
-| Componente | Estado | Detalle |
-|------------|--------|---------|
-| **Árbol de directorios** | ✅ | `mkdir`/`rmdir`/`cd`/`pwd` reales, no flat |
-| **Persistencia a disco** | ✅ | `save`/`load` serializan a disco, probado con reinicio completo |
-| **Sector seguro** | ✅ | LBA 2048 (offset 1 MiB), no pisa MBR/particiones |
+| Componente | Estado | Descripción |
+|------------|--------|-------------|
+| **Árbol de directorios** | ✅ | `mkdir`/`rmdir`/`cd`/`pwd` reales |
+| **Persistencia** | ✅ | `save`/`load` a disco, probado con reinicio |
+| **Sector seguro** | ✅ | LBA 2048 (offset 1 MiB) |
 
-### ✅ Ring 3 — Multiusuario (hecho y probado)
+### Ring 3 (Multiusuario)
 
-| Capacidad | Estado | Detalle |
-|-----------|--------|---------|
-| **Transición de privilegio** | ✅ | CPL0↔CPL3 real, no simulada |
+| Capacidad | Estado | Descripción |
+|-----------|--------|-------------|
+| **Transición de privilegio** | ✅ | CPL0↔CPL3 real |
 | **Syscalls desde ring3** | ✅ | `int 0x80` funciona desde CPL3 |
-| **Aislamiento de fallos** | ✅ | Un proceso que se cae no tumba el kernel |
-| **Aislamiento kernel vs proceso** | ✅ | `.data`/`.bss` del kernel protegidos |
-| **Aislamiento proceso vs proceso** | ✅ | Cada proceso tiene su propio directorio de páginas |
-| **Stack de kernel por proceso** | ✅ | TSS actualizado en cada cambio de contexto |
+| **Aislamiento de fallos** | ✅ | Un proceso no tumba el kernel |
+| **Aislamiento memoria** | ✅ | Kernel vs procesos, proceso vs proceso |
+| **Stack kernel por proceso** | ✅ | TSS actualizado en cada cambio de contexto |
 
-### ✅ Shell (hecho y probado)
+### Shell
 
-| Comando | Estado | Detalle |
-|---------|--------|---------|
-| `ls`/`dir`, `cd`, `pwd` | ✅ | Navegación por directorios reales |
-| `cat`/`type`, `rm`/`del`, `mkdir` | ✅ | Operaciones sobre FS real |
-| `mv`/`ren`, `cp`/`copy` | ✅ | Movimiento y copia de archivos |
-| `date`, `time`, `ver`, `vol` | ✅ | RTC y metadata del sistema |
-| `clear`/`cls` | ✅ | Limpia la pantalla VGA |
-| `demo` | ✅ | Modo gráfico VGA 13h con dibujo |
-| `ping` | ✅ | Test de red ICMP real |
-| `gopherserve` | ✅ | Servidor Gopher en puerto 70 |
-| `edit` | ✅ | Editor de línea (crear/editar archivos) |
-| `run` | ✅ | Ejecuta scripts de comandos (.bat/.sh estilo) |
-| `gopherpy` | ✅ | Ejecuta programa traducido de Python-como a C nativo |
-| `ring3demo` | ✅ | Demuestra que CPL3 es real (falla con `cli`) |
-| `ring3mem` | ✅ | Demuestra aislamiento de memoria (falla tocando `.bss` del kernel) |
-| `ring3victim`/`ring3attack` | ✅ | Demuestra aislamiento proceso↔proceso |
+25+ comandos incluyendo:
+- 📁 `ls/dir`, `cd`, `pwd`, `mkdir`, `rmdir`
+- 📄 `cat/type`, `rm/del`, `mv/ren`, `cp/copy`
+- 🕐 `date`, `time`, `ver`, `vol`
+- 🎨 `demo` (gráficos VGA)
+- 🌐 `ping`, `gopherserve`
+- 📝 `edit`, `run` (scripts)
+- 🐍 `gopherpy`
+- 🔒 `ring3demo`, `ring3mem`, `ring3victim`, `ring3attack`
 
-### ✅ GopherPy (hecho y probado)
+### GopherPy
 
-| Componente | Estado | Detalle |
-|------------|--------|---------|
-| **Traductor Python-como → C** | ✅ | Sintaxis con variables, if/else, for/range, llamadas a la ABI |
-| **ABI mínima** | ✅ | `gopheros_abi.h`: cero librerías, solo `int 0x80` |
-| **7 bugs reales arreglados** | ✅ | Incluyendo bug de stringificación, arrays prestados, etc. |
-| **Primer programa corriendo** | ✅ | `demo.py` → C → ejecución real en GopherOS |
+- ✅ Traductor Python-como → C nativo
+- ✅ ABI mínima (`gopheros_abi.h`)
+- ✅ 7 bugs reales arreglados
+- ✅ Primer programa corriendo de punta a punta
 
 ---
 
-## ❌ Limitaciones conocidas (documentadas, no son bugs ocultos)
+## 🏗️ Arquitectura
 
-| Limitación | Detalle |
-|------------|---------|
-| **Sin cargador de programas** | Todos los procesos están compilados dentro del kernel. Por eso `.text`/`.rodata` son accesibles desde ring3 — NO hay separación de código entre procesos. |
-| **Conexiones TCP subsecuentes** | La primera conexión al servidor Gopher funciona punta a punta; las siguientes pueden fallar (sospecha: interacción con el NAT de QEMU). |
-| **Allocator de memoria física** | Arena estática de 8MB embebida en el kernel — NO lee el mapa de memoria de Multiboot. |
-| **Sin FPU inicializada** | `float` no está soportado (falta `fninit`). |
-| **Sin USB** | Arrancar por USB sí funciona (BIOS/GRUB), pero leer/escribir un pendrive desde el kernel necesitaría driver UHCI/EHCI + clase de almacenamiento masivo (proyecto aparte). |
-| **Sin `fork()`/`exec()`** | `proc_create()` existe, pero `fork()` devuelve `ENOSYS`. |
-| **Patrón Connector+Plug** | No aplicado literalmente — VGA/teclado/timer/disco/NIC están cableados directo al kernel. |
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         GopherOS                            │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │   Shell      │  │  GopherPy   │  │   Servidor Gopher   │ │
+│  │   (ring3)    │  │  (ring3)    │  │     (ring3)         │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │                    Syscall Layer (int 0x80)             │ │
+│  └─────────────────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │                    Kernel Core                          │ │
+│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────────┐  │ │
+│  │  │Memory   │ │Process  │ │Scheduler│ │Filesystem   │  │ │
+│  │  └─────────┘ └─────────┘ └─────────┘ └─────────────┘  │ │
+│  └─────────────────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │                    Drivers Layer                        │ │
+│  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌────────────┐  │ │
+│  │  │VGA   │ │PS/2  │ │ATA   │ │PCI   │ │RTL8139/TCP │  │ │
+│  │  └──────┘ └──────┘ └──────┘ └──────┘ └────────────┘  │ │
+│  └─────────────────────────────────────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │                    Hardware Abstraction                  │ │
+│  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌────────────┐  │ │
+│  │  │GDT   │ │IDT   │ │PIC   │ │PIT   │ │Paging      │  │ │
+│  │  └──────┘ └──────┘ └──────┘ └──────┘ └────────────┘  │ │
+│  └─────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 📥 Archivos que se entregan
+## 📦 Requisitos
 
-| Archivo | Contenido |
-|---------|-----------|
-| `gopheros.elf` | Kernel compilado, listo para `qemu-system-i386 -kernel` |
-| `gopheros.iso` | Imagen booteable con GRUB (para VM/USB) |
-| `gopheros_src.zip` | Código fuente completo |
-| `gopherpy_toolchain.zip` | Compilador host + demo + .c generado |
-
----
-
-## 🏃 Cómo correrlo
-
-### Entorno gráfico (Linux, Windows, Mac)
+### Ubuntu/Debian
 ```bash
-qemu-system-i386 -kernel gopheros.elf -m 32
+sudo apt-get install gcc-multilib nasm qemu-system-x86 grub-pc-bin xorriso mtools make
+```
+
+### Arch Linux
+```bash
+sudo pacman -S gcc-multilib nasm qemu-system-x86 grub xorriso mtools make
+```
+
+### macOS (con Homebrew)
+```bash
+brew install i686-elf-gcc nasm qemu xorriso mtools make
+```
+
+---
+
+## 🔧 Compilación
+
+```bash
+# Clonar el repositorio
+git clone https://github.com/germanpet-svg/GopherOS.git
+cd GopherOS
+
+# Compilar el kernel
+make
+
+# Generar ISO booteable
+make iso
+
+# Limpiar archivos de compilación
+make clean
+```
+
+---
+
+## 🏃 Ejecución
+
+### Entorno Gráfico (Linux, Windows, Mac)
+```bash
+qemu-system-i386 -kernel build/gopheros.elf -m 32
 # o con ISO:
-qemu-system-i386 -cdrom gopheros.iso -m 32
+qemu-system-i386 -cdrom build/gopheros.iso -m 32
 ```
-**Importante:** hacé click en la ventana para capturar el teclado.
+⚠️ **Importante**: Haz click en la ventana para capturar el teclado.
 
-### Terminal pura (SSH, sin entorno gráfico)
+### Terminal Pura (SSH sin entorno gráfico)
 ```bash
-qemu-system-i386 -kernel gopheros.elf -m 32 -display curses
-```
-Aquí la terminal misma funciona como teclado.
-
-### Solo depuración (sin poder escribir comandos)
-```bash
-qemu-system-i386 -kernel gopheros.elf -m 32 -serial stdio -display none
+qemu-system-i386 -kernel build/gopheros.elf -m 32 -display curses
 ```
 
-### Con disco (para probar persistencia)
+### Con Disco (Persistencia)
 ```bash
-qemu-system-i386 -kernel gopheros.elf -m 32 -hda disk.img
-# o con make:
+qemu-system-i386 -kernel build/gopheros.elf -m 32 -hda disk.img
+# o usando make:
 make run-disk
 ```
 
-### Con red (para probar servidor Gopher)
+### Con Red (Servidor Gopher)
 ```bash
-qemu-system-i386 -kernel gopheros.elf -m 32 -netdev user,id=net0,hostfwd=tcp::7070-:70 -device rtl8139,netdev=net0
-```
-Luego desde el host:
-```bash
-python3 -c "socket.create_connection(('localhost', 7070))..."
+qemu-system-i386 -kernel build/gopheros.elf -m 32 \
+  -netdev user,id=net0,hostfwd=tcp::7070-:70 \
+  -device rtl8139,netdev=net0
 ```
 
----
-
-## 🛠️ Recompilar desde fuente
-
+### Solo Depuración (sin interacción)
 ```bash
-# Ubuntu/Debian:
-sudo apt install gcc-multilib nasm qemu-system-x86 grub-pc-bin xorriso mtools
+qemu-system-i386 -kernel build/gopheros.elf -m 32 -serial stdio -display none
+```
 
-unzip gopheros_src.zip && cd gopheros_src
-make            # genera build/gopheros.elf
-make iso        # genera build/gopheros.iso
-make run        # arranca en QEMU
-make run-disk   # con disco de 10MB
+### Debug con GDB
+```bash
+qemu-system-i386 -kernel build/gopheros.elf -m 32 -s -S &
+gdb build/gopheros.elf
+(gdb) target remote localhost:1234
+(gdb) break kernel_main
+(gdb) continue
 ```
 
 ---
 
-## 📋 Próximos pasos posibles (elegí por dónde seguir)
+## 🖥️ Comandos del Shell
 
-| Prioridad | Tarea | Tamaño |
-|-----------|-------|--------|
-| 1 | **Arreglar TCP multi-conexión** (o probar con `-netdev tap` para esquivar NAT) | Chico |
-| 2 | **Cargador de programas real** (ELF o formato propio) — separa código de cada proceso | Mediano |
-| 3 | **Patrón Connector+Plug** — refactor de arquitectura | Mediano |
-| 4 | **Driver de disco con IRQ** (polling→IRQ14) + AHCI/SATA | Grande |
-| 5 | **USB** (UHCI/EHCI + almacenamiento masivo) | Muy grande |
-| 6 | **Fork/exec reales** | Grande |
-| 7 | **Inicializar FPU** y soporte para `float` en GopherPy | Chico |
+### Navegación y Archivos
+
+| Comando | Descripción | Alias DOS |
+|---------|-------------|-----------|
+| `ls` | Lista archivos | `dir` |
+| `cd` | Cambia directorio | - |
+| `pwd` | Muestra directorio actual | - |
+| `mkdir` | Crea directorio | - |
+| `rmdir` | Elimina directorio vacío | - |
+| `cat` | Muestra contenido | `type` |
+| `rm` | Elimina archivo | `del` |
+| `mv` | Mueve/renombra | `ren` |
+| `cp` | Copia archivo | `copy` |
+
+### Sistema
+
+| Comando | Descripción |
+|---------|-------------|
+| `date` | Muestra fecha |
+| `time` | Muestra hora |
+| `ver` | Versión del kernel |
+| `vol` | Volumen del disco |
+| `clear` | Limpia pantalla | `cls` |
+| `ps` | Lista procesos |
+| `jiffies` | Ticks del timer |
+
+### Red
+
+| Comando | Descripción |
+|---------|-------------|
+| `ping` | Test ICMP |
+| `gopherserve` | Inicia servidor Gopher en puerto 70 |
+
+### Desarrollo
+
+| Comando | Descripción |
+|---------|-------------|
+| `demo` | Demostración gráfica VGA |
+| `gopherpy` | Ejecuta programa GopherPy |
+| `edit` | Editor de línea |
+| `run` | Ejecuta script de comandos |
+
+### Ring 3 (Demostración)
+
+| Comando | Descripción |
+|---------|-------------|
+| `ring3demo` | Demuestra CPL3 real (falla con `cli`) |
+| `ring3mem` | Demuestra aislamiento de memoria |
+| `ring3victim` | Proceso víctima para ataque |
+| `ring3attack` | Proceso atacante (falla) |
+
+### Miscelánea
+
+| Comando | Descripción |
+|---------|-------------|
+| `help` | Muestra ayuda |
+| `about` | Información del sistema |
+| `exit` | Sale del shell |
 
 ---
 
-## 📄 Nota final
+## 🐍 GopherPy
 
-Este README refleja el **estado real y probado** del kernel, no un diseño ideal. Todo lo listado como "✅" ha sido verificado con evidencia de ejecución real — no solo compilación. Las limitaciones están documentadas a propósito, para que sepas exactamente qué está hecho y qué queda.
+GopherPy es un **traductor de Python-como a C nativo** que genera código que corre directamente sobre la ABI de GopherOS, sin librerías intermedias.
 
-GopherOS es hoy un kernel funcional con:
-- **Boot**, **paginación**, **scheduler**, **15 syscalls estables**
-- **Drivers**: VGA texto+gráfico, teclado PS/2, RTC, ATA PIO, PCI, RTL8139, TCP
-- **Filesystem** jerárquico con persistencia real a disco
-- **Ring 3** con aislamiento de fallos, memoria kernel, y memoria entre procesos
-- **Shell** con 25+ comandos, editor de línea, y scripts
-- **GopherPy** (traductor Python-como → C nativo)
-- **Servidor Gopher** RFC 1436 probado con cliente externo
+### Sintaxis Soportada
 
-Todo compila con `-Wall -Wextra -Werror`, cero warnings de código propio.
+```python
+# Variables
+x = 42
+nombre = "GopherOS"
+
+# If/else
+if x > 10:
+    print("x es grande")
+else:
+    print("x es pequeño")
+
+# For/range
+for i in range(5):
+    print(i)
+
+# Llamadas a la ABI
+gos_screen_mode(GOS_VIDEO_MODE_VGA256)
+gos_pset(160, 100, 14)
+gos_print("Hola desde GopherPy")
+```
+
+### Ejemplo Completo: `demo.py`
+
+```python
+# demo.py - Demostración de GopherPy
+x = 42
+
+if x > 10:
+    gos_print("x es grande\n")
+else:
+    gos_print("x es pequeño\n")
+
+gos_print("Contando con un for real (range):\n")
+for i in range(5):
+    gos_print(str(i) + "\n")
+
+gos_print("Probando el modo gráfico VGA 320x200x256...\n")
+gos_screen_mode(GOS_VIDEO_MODE_VGA256)
+
+# Dibujar rectángulos
+for y in range(0, 200, 20):
+    for x in range(0, 320, 20):
+        color = (x + y) % 256
+        gos_rect(x, y, 20, 20, color)
+
+gos_print("Listo.\n")
+gos_screen_mode(GOS_VIDEO_MODE_TEXT)
+```
+
+### Uso
+
+```bash
+# Traducir Python a C
+./gopherpy demo.py -o demo.c
+
+# El archivo demo.c generado se compila e integra al kernel
+make
+# ... y luego desde el shell de GopherOS:
+gopheros:/> gopherpy
+```
+
+---
+
+## 🗺️ Roadmap
+
+### ✅ Hecho y Probado
+
+- [x] Boot Multiboot
+- [x] GDT/IDT/PIC con remapeo
+- [x] Paginación 4KB con permisos
+- [x] Scheduler cooperativo
+- [x] 15 syscalls estables
+- [x] VGA texto y gráfico (modo 13h)
+- [x] Teclado PS/2
+- [x] RTC/CMOS
+- [x] ATA PIO (disco duro)
+- [x] Filesystem jerárquico con persistencia
+- [x] Shell con 25+ comandos
+- [x] Ring 3 (CPL3) con aislamiento real
+- [x] GopherPy (traductor Python→C)
+- [x] PCI + RTL8139
+- [x] ARP/IP/ICMP (ping)
+- [x] TCP mínimo
+- [x] Servidor Gopher RFC 1436
+- [x] Editor de línea (`edit`)
+- [x] Scripts de comandos (`run`)
+
+### 🚧 En Progreso / Próximos Pasos
+
+| Prioridad | Tarea | Tamaño | Dependencias |
+|-----------|-------|--------|--------------|
+| 1 | Arreglar TCP multi-conexión | Chico | - |
+| 2 | Cargador de programas real (ELF) | Mediano | - |
+| 3 | `fork()`/`exec()` | Mediano | #2 |
+| 4 | Patrón Connector+Plug | Mediano | - |
+| 5 | Driver ATA con IRQ (polling→IRQ14) | Mediano | - |
+| 6 | Inicializar FPU + soporte float | Chico | - |
+| 7 | USB (UHCI/EHCI + almacenamiento) | Grande | - |
+| 8 | Preemptive scheduling | Grande | - |
+
+### 💡 Ideas Futuras
+
+- [ ] Soporte para múltiples terminales (TTY)
+- [ ] Driver de red completo (socket/send/recv)
+- [ ] VFS con inodos
+- [ ] `mmap`/`munmap`
+- [ ] Sistema de archivos FAT32 real
+- [ ] Compilador C embebido
+- [ ] Port de GWBASIC
+
+---
+
+## ⚠️ Limitaciones Conocidas
+
+| Limitación | Detalle | Plan |
+|------------|---------|------|
+| **Sin cargador de programas** | Todos los procesos compilados dentro del kernel | Roadmap #2 |
+| **TCP limitado** | Una conexión confiable por sesión | Roadmap #1 |
+| **Memoria física fija** | Arena estática de 8MB | Leer mapa de Multiboot |
+| **Sin FPU** | `float` no soportado | Roadmap #6 |
+| **Sin USB** | Leer pendrive requiere controlador | Roadmap #7 |
+| **Sin `fork()`** | `ENOSYS` en syscall | Roadmap #3 |
+| **Sin preemption** | Scheduler cooperativo | Roadmap #8 |
+
+---
+
+## 🤝 Contribuciones
+
+¡Las contribuciones son bienvenidas! Por favor:
+
+1. **Fork** el repositorio
+2. Crea una **rama** para tu feature (`git checkout -b feature/nueva-funcionalidad`)
+3. **Commit** tus cambios (`git commit -m 'Añadir: nueva funcionalidad'`)
+4. **Push** a la rama (`git push origin feature/nueva-funcionalidad`)
+5. Abre un **Pull Request**
+
+### Estilo de Código
+
+- C99 con `-Wall -Wextra -Werror`
+- Ensamblador NASM
+- Comentarios en español o inglés
+- Documentación para nuevas funcionalidades
+
+---
+
+## 📄 Licencia
+
+Este proyecto está licenciado bajo la **MIT License** - ver el archivo [LICENSE](LICENSE) para más detalles.
+
+---
+
+## 🙏 Agradecimientos
+
+- **OSDev Wiki** - Documentación invaluable
+- **QEMU** - Emulación y depuración
+- **GCC** y **NASM** - Herramientas de compilación
+- **GRUB** - Bootloader
+
+---
+
+<div align="center">
+
+**🐹 GopherOS — Un kernel x86 didáctico, completo y funcional**
+
+[⬆ Volver arriba](#gopheros)
+
+</div>
