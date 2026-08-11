@@ -1,0 +1,30 @@
+# Makefile - prototipo aislado de transicion a long mode.
+# No depende ni interfiere con el Makefile del kernel real (../../Makefile).
+#
+# IMPORTANTE: correr con qemu-system-x86_64, no qemu-system-i386 — el CPU
+# que emula qemu-system-i386 por defecto no soporta long mode (sin bit LM
+# en CPUID). El kernel real (32 bits) sigue corriendo con qemu-system-i386
+# sin cambios; esto es aparte a proposito.
+
+AS = nasm
+LD = ld
+BUILD = build
+
+all: $(BUILD)/longmode_test.elf
+
+$(BUILD):
+	mkdir -p $(BUILD)
+
+$(BUILD)/longmode_test.o: longmode_test.s | $(BUILD)
+	$(AS) -f elf32 $< -o $@
+
+$(BUILD)/longmode_test.elf: $(BUILD)/longmode_test.o linker.ld
+	$(LD) -m elf_i386 -T linker.ld -nostdlib -o $@ $(BUILD)/longmode_test.o
+
+run: $(BUILD)/longmode_test.elf
+	qemu-system-x86_64 -kernel $(BUILD)/longmode_test.elf -m 32 -display none -serial stdio
+
+clean:
+	rm -rf $(BUILD)
+
+.PHONY: all run clean
