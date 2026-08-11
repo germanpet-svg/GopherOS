@@ -113,6 +113,20 @@ GopherOS es un **kernel x86 de 32 bits didáctico** y funcional, escrito en C y 
 - ✅ 7 bugs reales arreglados
 - ✅ Primer programa corriendo de punta a punta
 
+### 🆕 Mejoras Recientes (Agosto 2026)
+
+#### Editor de Línea con Comandos
+El editor ahora soporta comandos de edición de línea reales:
+- `:l` — Lista las líneas actuales, numeradas
+- `:d N` — Borra la línea N
+- `:r N <texto>` — Reemplaza la línea N
+- `:i N <texto>` — Inserta una línea nueva antes de la N (corre las demás)
+- `:help` — Vuelve a mostrar la ayuda
+- Prompt ahora muestra el número de línea actual (`3> ` en vez de `> `)
+
+#### Rediseño del Editor para Evitar Bugs
+El editor fue rediseñado para evitar una miscompilación con `-O1/-O2` que causaba Page Faults. Ahora `kb_readline()` se llama ÚNICAMENTE desde el loop principal del shell, nunca desde funciones anidadas. El modo edición es una máquina de estados — cuando está activo, cada línea tipeada se manda a `edit_process_line()` en vez del dispatcher normal de comandos.
+
 ---
 
 ## 🏗️ Arquitectura
@@ -275,7 +289,7 @@ gdb build/gopheros.elf
 |---------|-------------|
 | `demo` | Demostración gráfica VGA |
 | `gopherpy` | Ejecuta programa GopherPy |
-| `edit` | Editor de línea |
+| `edit` | Editor de línea con comandos (`:l`, `:d N`, `:r N`, `:i N`) |
 | `run` | Ejecuta script de comandos |
 
 ### Ring 3 (Demostración)
@@ -387,8 +401,9 @@ gopheros:/> gopherpy
 - [x] ARP/IP/ICMP (ping)
 - [x] TCP mínimo
 - [x] Servidor Gopher RFC 1436
-- [x] Editor de línea (`edit`)
+- [x] Editor de línea con comandos (`edit` con :l, :d, :r, :i)
 - [x] Scripts de comandos (`run`)
+- [x] Rediseño del editor para evitar miscompilación con -O1/-O2
 
 ### 🚧 En Progreso / Próximos Pasos
 
@@ -412,6 +427,7 @@ gopheros:/> gopherpy
 - [ ] Sistema de archivos FAT32 real
 - [ ] Compilador C embebido
 - [ ] Port de GWBASIC
+- [ ] Multiprocesador (SMP)
 
 ---
 
@@ -426,6 +442,7 @@ gopheros:/> gopherpy
 | **Sin USB** | Leer pendrive requiere controlador | Roadmap #7 |
 | **Sin `fork()`** | `ENOSYS` en syscall | Roadmap #3 |
 | **Sin preemption** | Scheduler cooperativo | Roadmap #8 |
+| **Sin multiprocesador** | Scheduler monoprocesador | Futuro |
 
 ---
 
